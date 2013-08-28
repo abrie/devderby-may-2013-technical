@@ -1,8 +1,8 @@
 "use strict";
 
-requirejs( ['webcam','ardetector'], function(webcam,ardetector) {
+requirejs( ['webcam','ardetector','arview'], function(webcam,ardetector,arview) {
 
-    var canvas, context, detector = undefined;
+    var canvas, context, detector, view = undefined;
 
     // Initializes components and starts the game loop
     function initialize() {
@@ -15,16 +15,19 @@ requirejs( ['webcam','ardetector'], function(webcam,ardetector) {
         // We need a context for the canvas in order to copy to it.
         context = canvas.getContext('2d');
 
-        // For demonstration purposes add the canvas to the DOM so we can see it.
-        document.getElementById("application").appendChild( canvas );
-        
+        // Create an AR View for displaying the augmented reality scene
+        view = arview.create( webcam.getDimensions(), canvas );
+
+        // Place the arview's GL canvas into the DOM.
+        document.getElementById("application").appendChild( view.glCanvas );
+
         // create an AR Marker detector using the canvas as the data source
         detector = ardetector.create( canvas );
     }
 
     // Runs one iteration of the game loop
     function tick() {
-        // Copy an image from the camera stream onto our canvas
+        // Copy an image from the camara stream onto our canvas
         webcam.copyToContext(context);
 
         // The ardetector requires that we set a flag when the canvas has changed.
@@ -32,6 +35,10 @@ requirejs( ['webcam','ardetector'], function(webcam,ardetector) {
 
         // Ask the detector to make a detection pass.
         detector.detect( onMarkerCreated, onMarkerUpdated, onMarkerDestroyed );
+
+        // Update and render the AR view
+        view.update();
+        view.render();
 
         // Request another iteration of the gameloop
         window.requestAnimationFrame(tick);
