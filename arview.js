@@ -34,6 +34,31 @@ define(["lib/three.min"], function() {
         }
     }
 
+    var Scene = function() {
+        var scene = new THREE.Scene();
+        var camera = new THREE.Camera();
+
+        function add(object) {
+            scene.add(object);
+        }
+
+        function remove(object) {
+            scene.remove(object);
+        }
+
+        function setProjectionMatrix(matrix) {
+            camera.projectionMatrix.setFromArray( matrix );
+        }
+
+        return {
+            scene:scene,
+            camera:camera,
+            add:add,
+            remove:remove,
+            setProjectionMatrix:setProjectionMatrix,
+        }
+    }
+
     var create = function(dimensions, sourceCanvas) {
         // Create a canvas which will be used for WebGL
         var glCanvas = document.createElement('canvas');
@@ -45,10 +70,19 @@ define(["lib/three.min"], function() {
 
         // Create a reality scene
         var reality = new Reality(sourceCanvas);
+        var virtual = new Scene();
+
+        var light = new THREE.SpotLight(0xffffff);
+        light.position.set(0, 0, 9000);
+        light.lookAt( new THREE.Vector3(0,0,0) );
+        virtual.scene.add(light);
 
         function render() {
             // Render the reality scene
             renderer.render(reality.scene, reality.camera);
+
+            // Render the augmented components on top of the reality scene.
+            renderer.render(virtual.scene, virtual.camera);
         }
 
         function update() {
@@ -56,10 +90,25 @@ define(["lib/three.min"], function() {
             reality.update();
         }
 
+        function setCameraMatrix( matrix ) {
+            virtual.setProjectionMatrix( matrix );
+        }
+
+        function add( object ) {
+            virtual.add( object.model );
+        }
+
+        function remove( object ) {
+            virtual.remove( object.model );
+        }
+
         return {
+            add: add,
+            remove: remove,
             update: update,
             render: render,
             glCanvas: glCanvas,
+            setCameraMatrix: setCameraMatrix,
         }
     }
 

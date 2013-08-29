@@ -1,6 +1,6 @@
 "use strict";
 
-requirejs( ['webcam','ardetector','arview'], function(webcam,ardetector,arview) {
+requirejs( ['webcam','ardetector','arview','arobject'], function(webcam,ardetector,arview,arobject) {
 
     var canvas, context, detector, view = undefined;
 
@@ -15,14 +15,17 @@ requirejs( ['webcam','ardetector','arview'], function(webcam,ardetector,arview) 
         // We need a context for the canvas in order to copy to it.
         context = canvas.getContext('2d');
 
+        // create an AR Marker detector using the canvas as the data source
+        detector = ardetector.create( canvas );
+
         // Create an AR View for displaying the augmented reality scene
         view = arview.create( webcam.getDimensions(), canvas );
 
+        // Set the ARView camera projection matrix according to the detector
+        view.setCameraMatrix( detector.getCameraMatrix(10,1000) );
+
         // Place the arview's GL canvas into the DOM.
         document.getElementById("application").appendChild( view.glCanvas );
-
-        // create an AR Marker detector using the canvas as the data source
-        detector = ardetector.create( canvas );
     }
 
     // Runs one iteration of the game loop
@@ -52,17 +55,26 @@ requirejs( ['webcam','ardetector','arview'], function(webcam,ardetector,arview) 
 
     // This function is called when a marker is initally detected on the stream
     function onMarkerCreated(marker) {
-        console.log("Marker created:", marker.id);
+        var object = markerObjects[marker.id];
+        object.transform( marker.matrix );
+        view.add( object );
     }
 
     // This function is called when an existing marker is repositioned
     function onMarkerUpdated(marker) {
-        console.log("Marker updated:", marker.id);
+        var object = markerObjects[marker.id];
+        object.transform( marker.matrix );
     }
 
     // This function is called when a marker disappears from the stream.
     function onMarkerDestroyed(marker) {
-        console.log("Marker deleted:", marker.id);
+        var object = markerObjects[marker.id]; 
+        view.remove( object );
     }
 
+    // Create marker objects associated with the desired marker ID.
+    var markerObjects = {
+        16: arobject.createMarkerObject({color:0xAA0000}), // Marker #16, red.
+        32: arobject.createMarkerObject({color:0x00BB00}), // Marker #32, green.
+    };
 });
