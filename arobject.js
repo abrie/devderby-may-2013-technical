@@ -24,10 +24,18 @@ define(["lib/three.min"], function() {
 
     function createMarkerMesh(color) {
         var geometry = new THREE.CubeGeometry( 100,100,100 );
-        var material = new THREE.MeshPhongMaterial( {color:color, side:THREE.DoubleSide } );
+        var materials = [
+            new THREE.MeshPhongMaterial( {color:color, side:THREE.DoubleSide } ),
+            new THREE.MeshBasicMaterial( {visible:false} ),
+        ];
 
-        var mesh = new THREE.Mesh( geometry, material );                      
-        mesh.position.z = -50;
+        for( var i = 0; i < geometry.faces.length; i++ ) {
+            geometry.faces[ i ].materialIndex = 0;
+        }
+        geometry.faces[ 5 ].materialIndex = 1;
+
+        var mesh = new THREE.Mesh( geometry, new THREE.MeshFaceMaterial( materials ) );
+        mesh.position.z = 50;
 
         return mesh;
     }
