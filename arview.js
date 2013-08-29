@@ -86,8 +86,14 @@ define(["lib/three.min"], function() {
             // Render the reality scene
             renderer.render(reality.scene, reality.camera);
 
+            // Deactivate color buffer renderering, leaving only depth buffer active.
+            renderer.context.colorMask(false,false,false,false);
+
             // Render the occluder scene
             renderer.render( occluder.scene, occluder.camera);
+
+            // Reactivate color buffer rendering
+            renderer.context.colorMask(true,true,true,true);
 
             // Render the augmented components on top of the reality scene.
             renderer.render(virtual.scene, virtual.camera);
