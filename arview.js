@@ -70,7 +70,12 @@ define(["lib/three.min"], function() {
 
         // Create a reality scene
         var reality = new Reality(sourceCanvas);
+
+        // Create an augmented scene
         var virtual = new Scene();
+
+        // Create an occluder scene
+        var occluder = new Scene();
 
         var light = new THREE.SpotLight(0xffffff);
         light.position.set(0, 0, 9000);
@@ -80,6 +85,9 @@ define(["lib/three.min"], function() {
         function render() {
             // Render the reality scene
             renderer.render(reality.scene, reality.camera);
+
+            // Render the occluder scene
+            renderer.render( occluder.scene, occluder.camera);
 
             // Render the augmented components on top of the reality scene.
             renderer.render(virtual.scene, virtual.camera);
@@ -92,14 +100,17 @@ define(["lib/three.min"], function() {
 
         function setCameraMatrix( matrix ) {
             virtual.setProjectionMatrix( matrix );
+            occluder.setProjectionMatrix( matrix );
         }
 
         function add( object ) {
             virtual.add( object.model );
+            occluder.add( object.occluder );
         }
 
         function remove( object ) {
             virtual.remove( object.model );
+            occluder.remove( object.occluder );
         }
 
         return {

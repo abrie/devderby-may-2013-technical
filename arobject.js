@@ -40,19 +40,43 @@ define(["lib/three.min"], function() {
         return mesh;
     }
 
+    function createMarkerOccluderMesh() {
+        var geometry = new THREE.CubeGeometry( 100.1, 100.1, 100.1 );
+        var materials = [
+            new THREE.MeshBasicMaterial( {color:0x0000FF, side:THREE.DoubleSide } ),
+            new THREE.MeshBasicMaterial( {visible:false} ),
+        ];
+
+        for( var i = 0; i < geometry.faces.length; i++ ) {
+            geometry.faces[ i ].materialIndex = 0;
+        }
+        geometry.faces[ 5 ].materialIndex = 1;
+
+        var mesh = new THREE.Mesh( geometry, new THREE.MeshFaceMaterial( materials ) );
+        mesh.position.z = 50;
+
+        return mesh;
+    }
+
     function createMarkerObject(params) {
         var modelContainer = createContainer();
 
         var modelMesh = createMarkerMesh(params.color);
         modelContainer.add( modelMesh );
 
+        var occluderContainer = createContainer();
+        var occluderMesh = createMarkerOccluderMesh();
+        occluderContainer.add( occluderMesh );
+
         function transform(matrix) {
             modelContainer.transformFromArray( matrix );
+            occluderContainer.transformFromArray( matrix );
         }
 
         return {
             transform: transform,
-            model: modelContainer
+            model: modelContainer,
+            occluder: occluderContainer
         }
     }
 
