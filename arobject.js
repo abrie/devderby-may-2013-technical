@@ -40,6 +40,17 @@ define(["lib/three.min"], function() {
         return mesh;
     }
 
+    function createMarkerHitboxMesh() {
+        var geometry = new THREE.PlaneGeometry( 100, 100 );
+        var material = new THREE.MeshBasicMaterial({
+            visible:false,
+            side:THREE.DoubleSide
+        });
+        var mesh = new THREE.Mesh( geometry, material );
+
+        return mesh;
+    }
+
     function createMarkerOccluderMesh() {
         var geometry = new THREE.CubeGeometry( 100.1, 100.1, 100.1 );
         var materials = [
@@ -64,6 +75,9 @@ define(["lib/three.min"], function() {
         var modelMesh = createMarkerMesh(params.color);
         modelContainer.add( modelMesh );
 
+        var hitboxMesh = createMarkerHitboxMesh();
+        modelContainer.add( hitboxMesh );
+
         var occluderContainer = createContainer();
         var occluderMesh = createMarkerOccluderMesh();
         occluderContainer.add( occluderMesh );
@@ -76,7 +90,8 @@ define(["lib/three.min"], function() {
         return {
             transform: transform,
             model: modelContainer,
-            occluder: occluderContainer
+            occluder: occluderContainer,
+            hitbox: hitboxMesh,
         }
     }
 

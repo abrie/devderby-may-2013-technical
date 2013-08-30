@@ -57,7 +57,9 @@ requirejs( ['webcam','ardetector','arview','arobject'], function(webcam,ardetect
     function onMarkerCreated(marker) {
         var object = markerObjects[marker.id];
         object.transform( marker.matrix );
-        view.add( object );
+        view.add( object, function(isSelected) {
+            onMarkerSelectionChanged(marker.id, isSelected);
+        });
     }
 
     // This function is called when an existing marker is repositioned
@@ -70,6 +72,11 @@ requirejs( ['webcam','ardetector','arview','arobject'], function(webcam,ardetect
     function onMarkerDestroyed(marker) {
         var object = markerObjects[marker.id]; 
         view.remove( object );
+    }
+
+    // This function is called when a marker object is selected/unselected.
+    function onMarkerSelectionChanged(id, isSelected) {
+        console.log("Selection:",id,":",isSelected);
     }
 
     // Create marker objects associated with the desired marker ID.
