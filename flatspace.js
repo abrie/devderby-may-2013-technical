@@ -1,8 +1,8 @@
 "use strict";
 
-define(['boxworld', 'boxview'], function( boxworld, boxview ) {
+define(['boxworld', 'boxview', 'boxdebugdraw'], function( boxworld, boxview, boxdebugdraw ) {
 
-    var world, view = undefined;
+    var world, view, debugDraw = undefined;
 
     function initialize() {
         world = boxworld.create();
@@ -14,10 +14,19 @@ define(['boxworld', 'boxview'], function( boxworld, boxview ) {
         });
 
         document.getElementById("flatspace").appendChild( view.canvas );
+
+        debugDraw = boxdebugdraw.create( world, view );
+
     }
 
     function update() {
         world.update();
+        render();
+    }
+
+    function render() {
+        view.clear();
+        debugDraw.render();
     }
 
     return {
