@@ -6,6 +6,7 @@ requirejs( ['webcam','realspace','flatspace'], function( webcam, realspace, flat
     function initialize() {
         // Initialize the AR Display
         realspace.initialize();
+        realspace.setWarpholeStateListener( realspaceWarpholeStateChanged );
 
         // Initialize the Flat display
         flatspace.initialize();
@@ -24,6 +25,10 @@ requirejs( ['webcam','realspace','flatspace'], function( webcam, realspace, flat
 
          // Request another iteration of the gameloop
         window.requestAnimationFrame(tick);
+    }
+
+    function realspaceWarpholeStateChanged( id, isOpen ) {
+        console.log("state:",id,isOpen);
     }
 
     // Start the application once the user gives us authorization.

@@ -63,7 +63,7 @@ define(['webcam','ardetector','arview','arobject'], function(webcam,ardetector, 
 
     // This function is called when a marker object is selected/unselected.
     function onMarkerSelectionChanged(id, isSelected) {
-        console.log("Selection:",id,":",isSelected);
+        notifyWarpholeStateChanged( id, isSelected );
     }
 
     // Create marker objects associated with the desired marker ID.
@@ -72,8 +72,20 @@ define(['webcam','ardetector','arview','arobject'], function(webcam,ardetector, 
         32: arobject.createMarkerObject({color:0x00BB00}), // Marker #32, green.
     };
 
+    var warpholeStateListener = undefined;
+    function setWarpholeStateListener( callback ) {
+        warpholeStateListener = callback;
+    }
+
+    function notifyWarpholeStateChanged( id, isOpen ) {
+        if( warpholeStateListener ) {
+            warpholeStateListener( id, isOpen );
+        }
+    }
+
     return {
         initialize: initialize,
-        update: update
+        update: update,
+        setWarpholeStateListener:setWarpholeStateListener
     }
 });
