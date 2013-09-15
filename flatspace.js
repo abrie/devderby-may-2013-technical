@@ -45,13 +45,15 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
             {
                 x:0,
                 y:8,
-                radius:10
+                radius:1
             }
         );
 
         ball.onContact = function(object) {
             console.log("The ball has contacted:", object);
-            ball.isMarkedForDeletion = true;
+            if( object.is( ground ) ) {
+                ball.isMarkedForDeletion = true;
+            }
         };
     }
 

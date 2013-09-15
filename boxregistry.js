@@ -20,6 +20,7 @@ define([], function() {
                 body:body,
                 onContact: undefined,
                 isMarkedForDeletion:false,
+                is: function(object) { return object.id === id; },
             };
 
             objects[id] = object;
