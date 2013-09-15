@@ -5,6 +5,7 @@ define([], function() {
 
         var objects = {};
         var idCount = 0;
+        var deletionListeners = [];
 
         function nextId() {
             return idCount++;
@@ -18,6 +19,7 @@ define([], function() {
                 id:id,
                 body:body,
                 onContact: undefined,
+                isMarkedForDeletion:false,
             };
 
             objects[id] = object;
@@ -35,10 +37,32 @@ define([], function() {
             return getByBody( body );
         }
 
+        function addDeletionListener( callback ) {
+            deletionListeners.push( callback );
+        }
+
+        function notifyDeletionListeners( object ) {
+            deletionListeners.forEach( function( listener ) {
+                listener( object );
+            });
+        }
+
+        function processDeletions() {
+            for( var id in objects ) {
+                var object = objects[id];
+                if( object.isMarkedForDeletion ) {
+                    notifyDeletionListeners( object );
+                    delete objects[id];
+                }
+            }
+        }
+
         return {
             getByBody:getByBody,
             getByFixture:getByFixture,
             registerBody:registerBody,
+            processDeletions:processDeletions,
+            addDeletionListener:addDeletionListener,
         }
     }
 

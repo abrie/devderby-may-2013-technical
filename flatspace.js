@@ -51,6 +51,7 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
 
         ball.onContact = function(object) {
             console.log("The ball has contacted:", object);
+            ball.isMarkedForDeletion = true;
         };
     }
 

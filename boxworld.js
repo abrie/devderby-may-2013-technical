@@ -15,8 +15,15 @@ define(['boxregistry', 'lib/box2d'], function(boxregistry) {
         var b2world = new Box2D.b2World( gravity );
         var objects = boxregistry.create();
 
+        objects.addDeletionListener( function( object ) {
+            if( object.body ) {
+                b2world.DestroyBody( object.body );
+            }
+        });
+
         function update() {
             b2world.Step( 1/30, 20, 20 );
+            objects.processDeletions();
         }
 
         function add( bodyFunc, params ) {
@@ -37,6 +44,11 @@ define(['boxregistry', 'lib/box2d'], function(boxregistry) {
 
             var objectA = objects.getByFixture( fixtureA );
             var objectB = objects.getByFixture( fixtureB );
+
+            if( objectA.isMarkedForDeletion ||
+                objectB.isMarkedForDeletion ) {
+                return;
+            }
 
             if( objectA.onContact ) {
                 objectA.onContact( objectB );
