@@ -9,6 +9,9 @@ requirejs( ['webcam','realspace','flatspace'], function( webcam, realspace, flat
 
         // Initialize the Flat display
         flatspace.initialize();
+
+        // Populate the flatspace with objects
+        flatspace.populate();
     }
 
     // Runs one iteration of the game loop

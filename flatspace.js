@@ -1,6 +1,6 @@
 "use strict";
 
-define(['boxworld', 'boxview', 'boxdebugdraw'], function( boxworld, boxview, boxdebugdraw ) {
+define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, boxview, boxdebugdraw, boxbody ) {
 
     var world, view, debugDraw = undefined;
 
@@ -29,8 +29,20 @@ define(['boxworld', 'boxview', 'boxdebugdraw'], function( boxworld, boxview, box
         debugDraw.render();
     }
 
+    function populate() {
+        var ball = world.add(
+            boxbody.ball,
+            {
+                x:0,
+                y:8,
+                radius:10
+            }
+        );
+    }
+
     return {
         initialize: initialize,
+        populate: populate,
         update: update,
     }
 });

@@ -10,9 +10,15 @@ define(['lib/box2d'], function() {
             b2world.Step( 1/30, 20, 20 );
         }
 
+        function add( bodyFunc, params ) {
+            var body = bodyFunc( b2world, params );
+            return body;
+        }
+
         return {
             getb2world: function() { return b2world; },
             update:update,
+            add:add,
         }
     }
 
