@@ -39,9 +39,37 @@ define(['lib/box2d'], function() {
         return body;
     }
 
+    var hole = function( b2world, params ) {
+        var bodyDef = new Box2D.b2BodyDef();
+        bodyDef.set_type( Box2D.b2_staticBody );
+        bodyDef.set_position( new Box2D.b2Vec2( params.x, params.y ) );
+        var body = b2world.CreateBody( bodyDef );
+
+        var makeSensor = function( radius, theta) {
+            var shape = new Box2D.b2CircleShape();
+            var x = params.radius * Math.cos( theta );
+            var y = params.radius * Math.sin( theta );
+            shape.set_m_p( new Box2D.b2Vec2( x, y) );
+            shape.set_m_radius( 0.25 );
+            var fixture = body.CreateFixture( shape, 5.0 );
+            fixture.SetSensor( true );
+        }
+
+        var steps = 5;
+        var radius = 1.50;
+        for( var a = 0; a < steps; a++) {
+            var theta = 2*Math.PI/steps*a;
+            makeSensor( radius, theta ); 
+            makeSensor( radius/2, theta ); 
+        }
+
+        return body;
+    }
+
     return {
         ball:ball,
         edge:edge,
+        hole:hole
     }
 
 });

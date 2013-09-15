@@ -29,6 +29,7 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
         debugDraw.render();
     }
 
+    var warpholes = {};
     function populate() {
         var ground = world.add(
             boxbody.edge,
@@ -40,6 +41,21 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
             }
         );
 
+        warpholes[16] = world.add(
+            boxbody.hole,
+            {
+                x:0,
+                y:-8,
+                radius:1
+            }
+        );
+
+        warpholes[16].onContact = function( object ) {
+            if( object.is( ball ) ) {
+                console.log("The hole has contacted the ball.");
+            }
+        }
+
         var ball = world.add(
             boxbody.ball,
             {
@@ -50,9 +66,8 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
         );
 
         ball.onContact = function(object) {
-            console.log("The ball has contacted:", object);
             if( object.is( ground ) ) {
-                ball.isMarkedForDeletion = true;
+                console.log("The ball has contacted the ground.");
             }
         };
     }
