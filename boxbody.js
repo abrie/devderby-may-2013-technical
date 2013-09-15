@@ -23,8 +23,25 @@ define(['lib/box2d'], function() {
         return body;
     }
 
+    var edge = function( b2world, params ) {
+        var bodyDef = new Box2D.b2BodyDef();
+        bodyDef.set_position( new Box2D.b2Vec2( params.x, params.y ) );
+        var body = b2world.CreateBody( bodyDef );
+
+        var shape = new Box2D.b2EdgeShape();
+        shape.Set(
+            new Box2D.b2Vec2( -params.width/2, params.height/2 ),
+            new Box2D.b2Vec2( params.width/2, -params.height/2 )
+        );
+
+        var fixture = body.CreateFixture( shape, 0.0 );
+
+        return body;
+    }
+
     return {
-        ball:ball
+        ball:ball,
+        edge:edge,
     }
 
 });

@@ -30,6 +30,16 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
     }
 
     function populate() {
+        var ground = world.add(
+            boxbody.edge,
+            {
+                x:0,
+                y:-15,
+                width:20,
+                height:0,
+            }
+        );
+
         var ball = world.add(
             boxbody.ball,
             {
@@ -38,6 +48,10 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
                 radius:10
             }
         );
+
+        ball.onContact = function(object) {
+            console.log("The ball has contacted:", object);
+        };
     }
 
     return {

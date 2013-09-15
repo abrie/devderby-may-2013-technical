@@ -17,6 +17,7 @@ define([], function() {
             var object = {
                 id:id,
                 body:body,
+                onContact: undefined,
             };
 
             objects[id] = object;
