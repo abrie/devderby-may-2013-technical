@@ -53,7 +53,10 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
         warpholes[16].onContact = function( object ) {
             if( object.is( ball ) ) {
                 var isOpen = warpholes[16].isOpen === true;
-                console.log("The hole has contacted the ball. isOpen:", isOpen);
+                if( isOpen ) {
+                    notifyBallTransited( 16 );
+                    ball.isMarkedForDeletion = true;
+                }
             }
         }
 
@@ -80,10 +83,22 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
         }
     }
 
+    var ballTransitListener = undefined;
+    function setBallTransitListener( callback ) {
+        ballTransitListener = callback;
+    }
+
+    function notifyBallTransited( id ) {
+        if( ballTransitListener ) {
+            ballTransitListener( id );
+        }
+    }
+
     return {
         initialize: initialize,
         populate: populate,
         update: update,
         setWarpholeState: setWarpholeState,
+        setBallTransitListener: setBallTransitListener,
     }
 });

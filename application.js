@@ -10,6 +10,7 @@ requirejs( ['webcam','realspace','flatspace'], function( webcam, realspace, flat
 
         // Initialize the Flat display
         flatspace.initialize();
+        flatspace.setBallTransitListener( flatspaceBallTransitedWarphole );
 
         // Populate the flatspace with objects
         flatspace.populate();
@@ -29,6 +30,10 @@ requirejs( ['webcam','realspace','flatspace'], function( webcam, realspace, flat
 
     function realspaceWarpholeStateChanged( id, isOpen ) {
         flatspace.setWarpholeState( id, isOpen );
+    }
+
+    function flatspaceBallTransitedWarphole( id ) {
+        console.log("ball has transited through flatspace warphole #",id);
     }
 
     // Start the application once the user gives us authorization.
