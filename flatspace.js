@@ -52,7 +52,8 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
 
         warpholes[16].onContact = function( object ) {
             if( object.is( ball ) ) {
-                console.log("The hole has contacted the ball.");
+                var isOpen = warpholes[16].isOpen === true;
+                console.log("The hole has contacted the ball. isOpen:", isOpen);
             }
         }
 
@@ -72,9 +73,17 @@ define(['boxworld', 'boxview', 'boxdebugdraw', 'boxbody'], function( boxworld, b
         };
     }
 
+    function setWarpholeState( id, isOpen ) {
+        var warphole = warpholes[id];
+        if( warphole ) {
+            warphole.isOpen = isOpen;
+        }
+    }
+
     return {
         initialize: initialize,
         populate: populate,
         update: update,
+        setWarpholeState: setWarpholeState,
     }
 });

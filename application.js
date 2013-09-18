@@ -28,7 +28,7 @@ requirejs( ['webcam','realspace','flatspace'], function( webcam, realspace, flat
     }
 
     function realspaceWarpholeStateChanged( id, isOpen ) {
-        console.log("state:",id,isOpen);
+        flatspace.setWarpholeState( id, isOpen );
     }
 
     // Start the application once the user gives us authorization.
