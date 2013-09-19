@@ -181,15 +181,27 @@ define(["lib/three.min"], function() {
         }
 
         function add( object, selectionCallback ) {
-            virtual.add( object.model );
-            occluder.add( object.occluder );
-            reticle.add( object.hitbox, selectionCallback);
+            if( object.model ) {
+                virtual.add( object.model );
+            }
+            if( object.occluder ) {
+                occluder.add( object.occluder );
+            }
+            if( object.hitbox ) {
+                reticle.add( object.hitbox, selectionCallback);
+            }
         }
 
         function remove( object ) {
-            virtual.remove( object.model );
-            occluder.remove( object.occluder );
-            reticle.remove( object.hitbox );
+            if( object.model ) {
+                virtual.remove( object.model );
+            }
+            if( object.occluder ) {
+                occluder.remove( object.occluder );
+            }
+            if( object.hitbox ) {
+                reticle.remove( object.hitbox );
+            }
         }
 
         return {

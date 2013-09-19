@@ -83,9 +83,16 @@ define(['webcam','ardetector','arview','arobject'], function(webcam,ardetector, 
         }
     }
 
+    function addBall() {
+        var ball = arobject.createBallObject();
+        view.add( ball );
+        ball.setPosition(0,0,15);
+    }
+
     return {
         initialize: initialize,
         update: update,
-        setWarpholeStateListener:setWarpholeStateListener
+        setWarpholeStateListener:setWarpholeStateListener,
+        addBall: addBall,
     }
 });

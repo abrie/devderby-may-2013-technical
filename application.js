@@ -34,6 +34,7 @@ requirejs( ['webcam','realspace','flatspace'], function( webcam, realspace, flat
 
     function flatspaceBallTransitedWarphole( id ) {
         console.log("ball has transited through flatspace warphole #",id);
+        realspace.addBall();
     }
 
     // Start the application once the user gives us authorization.

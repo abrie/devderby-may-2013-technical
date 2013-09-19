@@ -95,7 +95,32 @@ define(["lib/three.min"], function() {
         }
     }
 
+    function createBallMesh() {
+        var geometry = new THREE.SphereGeometry( 1, 64, 64 );
+        var material = new THREE.MeshPhongMaterial( { color: 0xFFFFFF } );
+        var mesh = new THREE.Mesh( geometry, material );
+
+        return mesh;
+    }
+
+    function createBallObject() {
+        var modelContainer = createContainer();
+        var modelMesh = createBallMesh();
+        modelContainer.add( modelMesh );
+
+        function setPosition(x,y,z) {
+            modelContainer.position.set(x,y,z);
+            modelContainer.updateMatrix();
+        }
+
+        return {
+            model:modelContainer,
+            setPosition:setPosition,
+        }
+    }
+
     return {
-        createMarkerObject:createMarkerObject
+        createMarkerObject:createMarkerObject,
+        createBallObject:createBallObject
     }
 });
