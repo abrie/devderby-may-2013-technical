@@ -28,7 +28,8 @@ define(['boxregistry', 'lib/box2d'], function(boxregistry) {
 
         function add( bodyFunc, params ) {
             var body = bodyFunc( b2world, params );
-            return body;
+            var object = objects.registerBody( body );
+            return object;
         }
 
         var listener = new Box2D.b2ContactListener();
