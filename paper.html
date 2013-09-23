@@ -1,0 +1,585 @@
+<html>
+<head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1"></head>
+<body>
+
+<h1>An AR Game: Technical Overview</h1>
+
+<p><a href="https://developer.mozilla.org/fr/demos/detail/an-ar-game">An AR Game</a> is the first place entry for the <a href="https://developer.mozilla.org/en/demos/devderby/2013/may">May 2013</a>&nbsp;<a href="https://developer.mozilla.org/en/demos/devderby">Dev Derby</a>. It is an <a href="http://en.wikipedia.org/wiki/Augmented_reality">augmented reality</a> game. The objective is to transport rolling playpieces from a 2D physics world into a 3D space. The game is playable <a href="http://abrie.github.io/devderby-may-2013">here</a>, and demonstrated <a href="http://www.youtube.com/watch?v=Pa_EwQ0DoWk">here</a>. The objective of this paper is to describe the underlying design and an engineering approach.</p> 
+
+<p>Technically the game is a simple coupling of four sophisticated open source technologies. They are: <a href="http://dev.w3.org/2011/webrtc/editor/getusermedia.html">WebRTC</a>, <a href="https://github.com/kig/JSARToolKit">JSARToolkit</a>, <a href="https://github.com/mrdoob/three.js/">ThreeJS</a>, and <a href="https://github.com/kripken/box2d.js">Box2D.js</a>. This article describes each as we weave them together. We will work in a stepwise fashion, constructing the game as if designing it from the ground up. The code discussed in this article is available on <a href="https://github.com/abrie/devderby-may-2013-technical">github</a>, with a <a href="https://github.com/abrie/devderby-may-2013-technical/tags">tag</a> and <a href="http://abrie.github.io/devderby-may-2013-technical/">live</a> link for each tutorial step. Specific bits of summarized source will be referenced in this document, but for unabridged code the reader is directed to the 'diff' links. Videos demonstrating application behaviour are provided where appropriate.</p>
+<pre>git clone https://github.com/abrie/devderby-may-2013-technical.git
+</pre>
+
+<p>This paper will first discuss the AR panel (<a href="#realspace">realspace</a>), then the 2D panel (<a href="#flatspace">flatspace</a>), and conclude with a description of their <a href="#conduit">coupling</a>.</p>
+
+<h2 id="realspace">Panel of Realspace</h2>
+Realspace is what the camera sees overlaid with augmented units.
+
+<h3>Begin with a Skeleton</h3>
+<p id="example_0">
+<code>git checkout example_0</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_0/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_0}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_0">tag</a>
+</p>
+<p>We will organize our code into modules using <a href="http://requirejs.org/">RequireJS</a>. The starting point is a main module with two skeletal methods common to games. They are <code>initialize()</code>, invoked startup; and <code>tick()</code>, for every frame. Notice that the gameloop is driven by repeated calls to <a href="https://developer.mozilla.org/en-US/docs/Web/API/window.requestAnimationFrame">requestAnimationFrame</a>:</p>
+
+<pre lang="javascript">requirejs([], function() {
+
+    // Initializes components and starts the game loop
+    function initialize() {
+    }
+
+    // Runs one iteration of the game loop
+    function tick() {
+        // Request another iteration of the gameloop
+        window.requestAnimationFrame(tick);
+    }
+
+    // Start the application
+    initialize();
+    tick();
+});
+</pre>
+
+This gives us an application with an empty loop. We will build up from this foundation.
+
+
+<h3>Give the Skeleton an Eye</h3>
+<p id="example_1">
+<code>git checkout example_1</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_1/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_1}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_1">tag</a>
+</p>
+<p>AR games require a realtime video feed. <a href="http://en.wikipedia.org/wiki/HTML5">HTML5</a>'s <a href="http://en.wikipedia.org/wiki/Webrtc">WebRTC</a> provides access to the <a href="http://en.wikipedia.org/wiki/Webcam">camera</a>. Thus AR games are possible in modern browsers like <a href="http://en.wikipedia.org/wiki/Firefox">Firefox</a>. Good documentation concerning WebRTC and <a href="https://developer.mozilla.org/en-US/docs/Web/API/Navigator.getUserMedia">getUserMedia</a> may be found on <a href="https://developer.mozilla.org/">developer.mozilla.org</a>; and thus will not be repeated in this paper. A camera library is provided in the form of a <a href="http://requirejs.org/docs/api.html#define">RequireJS</a> module named <a href="https://github.com/abrie/devderby-may-2013-technical/blob/master/webcam.js">webcam.js</a> which we'll incorporate into our example.</p>
+<p>First the camera must initialized and authorized. The webcam.js module <a href="https://github.com/abrie/devderby-may-2013-technical/commit/4d7f2faa18b794be4bd0a10d4fa0c6dfa306e519/#L0R32">invokes a callback on user consent</a>. Then for each tick of the gameloop <a href="https://github.com/abrie/devderby-may-2013-technical/commit/4d7f2faa18b794be4bd0a10d4fa0c6dfa306e519/#L0R25">a frame is copied from the video element to a <code>canvas</code> context</a>. This is important because it makes the image data accesible. We'll use it in subsequent sections. For now our application is simply a <code>canvas</code> updated with a video frame at each tick.</p>
+
+<h3 id="jsartoolkit">Something Akin to a Visual Cortex</h3>
+
+<p id="example_2">
+<code>git checkout example_2</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_2/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_2}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_2">tag</a>
+</p>
+
+<p>JSARToolkit is an augmented reality engine. It identifies and describes the orientation of <a href="http://en.wikipedia.org/wiki/Fiduciary_marker">fiducial markers</a> in an image. Each marker is uniquely associated with a number. The markers recognized by JSARToolkit are available <a href="https://github.com/kig/JSARToolKit/tree/master/demos/markers">here</a> as PNG images named according to their ID number. (As of this writing the lack of PNG extension confuses Github...) For this game we will use #16 and #32, consolidated onto a single page:</p>
+<a href="16_and_32.png"><img src="16_and_32.png" height="50%"></a>
+
+<p>JSARToolkit found its beginnings as <a href="http://www.hitl.washington.edu/artoolkit/">ARToolkit</a>, which was written in <a href="http://en.wikipedia.org/wiki/C%2B%2B">C++</a> at the <a href="http://en.wikipedia.org/wiki/University_of_Washington">Univeristy of Washington</a>'s <a href="http://www.hitl.washington.edu/home/">HITLab</a> in <a href="http://en.wikipedia.org/wiki/Seattle">Seattle</a>. From there it has been forked and ported to number of languages, including <a href="http://nyatla.jp/nyartoolkit/wp/?page_id=198">Java</a>, and from Java to <a href="http://www.libspark.org/wiki/saqoosha/FLARToolKit/en">Flash</a>, and finally from Flash to <a href="https://github.com/kig/JSARToolKit">JS</a>. This ancestry causes some idiosyncrasies and inconsistent names, as we'll see.</p>
+
+<p>Let's take a look at the distilled functionality:</p>
+
+<pre lang="javascript"> // The raster object is the canvas to which we are copying video frames.
+ var JSARRaster = NyARRgbRaster_Canvas2D(canvas);
+
+ // The parameters object specifies the pixel dimensions of the input stream.
+ var JSARParameters = new FLARParam(canvas.width, canvas.height);
+                 
+ // The MultiMarkerDetector is the marker detection engine
+ var JSARDetector = new FLARMultiIdMarkerDetector(FLARParameters, 120);
+ JSARDetector.setContinueMode(true);
+
+ // Run the detector on a frame, which returns the number of markers detected.
+ var threshold = 64;
+ var count = JSARDetector.detectMarkerLite(JSARRaster, threshold);
+</pre>
+
+<p>Once a frame has been processed by <code>JSARDetector.detectMarkerLite()</code>, the JSARDetector object contains an index of detected markers. <code>JSARDetector.getIdMarkerData(index)</code> returns the ID number, and <code>JSARDetector.getTransformMatrix(index)</code> returns the spatial orientation. Using these methods is somewhat complicated by history, but we'll <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_2/ardetector.js#L10">wrap them in</a> <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_2/ardetector.js#L24">usable helper methods</a> and call them from a loop like this:</p>
+
+<pre id="detectorLoop" lang="javascript">
+var markerCount = JSARDetector.detectMarkerLite(JSARRaster, 90); 
+
+for( var index = 0; index &lt; markerCount; index++ ) {
+    // Get the ID number of the detected marker.
+    var id = getMarkerNumber(index);
+
+    // Get the transformation matrix of the detected marker.
+    var matrix = getTransformMatrix(index);
+}
+</pre>
+
+<p>Since the detector operates on a per-frame basis it is our responsibility to maintain marker state between frames. For example, any of the following may occur between two succesive frames:</p>
+
+<ul>
+    <li>a marker is first detected</li>
+    <li>an existing marker's position changes</li>
+    <li>an existing marker disappears from the stream.</li>
+</ul>
+
+<p>The state tracking <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_2/ardetector.js#L65">is implemented in ardetector.js</a>. To use it we instantiate a copy with the <code>canvas</code> receiving video frames:</p>
+
+<pre lang="javascript">// create an AR Marker detector using the canvas as the data source
+var detector = ardetector.create( canvas );
+</pre>
+
+<p>And with each tick the canvas <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_2/application.js#L34">image is scanned by the detector</a>, <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_2/application.js#L47">triggering callbacks as needed</a>:</p>  
+<pre lang="javascript">// Ask the detector to make a detection pass. 
+detector.detect( onMarkerCreated, onMarkerUpdated, onMarkerDestroyed );
+</pre>
+
+<p>As can be deduced from the code, our application now detects markers and writes its discoveries to the console.</p>
+
+<h3 id="threejs">Reality as a Plane</h3>
+
+<p id="example_3">
+<code>git checkout example_3</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_3/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_3}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_3">tag</a>
+</p>
+
+<p> An augmented reality display consists of a <i>reality</i> view overlaid with 3D models. Rendering such a display necessarily consists of two steps. The first is to render the <i>reality</i> view as captured by the camera. In the previous examples <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_2/application.js#L19">we simply copied that image to a <code>canvas</code></a>. But we want to augment the display with 3D models, and that requires a WebGL canvas. The complication is that a WebGL canvas has no context into which we can copy an image. As a workaround we render <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_3/arview.js#L11">a textured plane</a> into the WebGL scene, and as the texture we use images from the webcam. ThreeJS can use a <code>canvas</code> as a texture source, <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_3/arview.js#L14">so we can use the <code>canvas</code></a> <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_3/application.js#L31">which is receiving video frames</a>:</p>
+
+<pre lang="javascript">
+// Create a texture linked to the canvas.
+var texture = new THREE.Texture(canvas);
+</pre>
+
+<p>ThreeJS <a href="http://en.wikipedia.org/wiki/Cache_(computing)">caches</a> textures; therefore each time a video frame is copied to the <code>canvas</code> a flag must be set to indicate that the texture cache should be updated:</p>
+
+<pre>
+// We need to notify ThreeJS when the texture has changed.
+function update() {
+    texture.needsUpdate = true;
+}
+</pre>
+
+<img src="example_3.png"/>
+
+<p>This results in an application which, from the perspective of a user, is no different than <a href="#example_2">example_2</a>. But behind the scenes it's all WebGL, and it's in need of augmentation.</p>
+
+<h3>Augmenting Reality</h3>
+
+<p id="example_4">
+<code>git checkout example_4</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_4/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_4}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_4">tag</a>
+<a href="http://youtu.be/g4n9lebq_Kg">movie</a>
+</p>
+
+<p>We're ready for augmented components: the 3D models aligned to markers captured by the camera. First we must allow the ardector and ThreeJS to communicate, and then we'll be able to build some models to augment the fiducial markers.</p>
+
+<h4>Step 1: Transformation Translation</h4>
+<p> Programmers familiar with 3D graphics know that the rendering process requires two matrices: the model matrix (<a href="http://en.wikipedia.org/wiki/Transformation_matrix">transformation</a>) and a camera matrix (<a href="http://en.wikipedia.org/wiki/Camera_matrix">projection</a>). These are supplied by the <a href="https://github.com/abrie/devderby-may-2013-technical/blob/master/ardetector.js">ardetector</a> we implemented earier, but they cannot be used as is. The reason being that the matrix arrays provided by ardetector are incompatible with ThreeJS. For example, the helper method <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_4/ardetector.js#L24"><code>getTransformMatrix()</code></a> returns a <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Typed_arrays/Float32Array">Float32Array</a> which ThreeJS does not accept. Fortunately the conversion is straightforward and easily done through a prototype extension, also known as <a href="http://en.wikipedia.org/wiki/Monkey_patch">monkey patching</a>:</p>
+
+<pre lang="javascript">
+// Allow Matrix4 to be set using a Float32Array
+THREE.Matrix4.prototype.setFromArray = function(m) {
+ return this.set(
+  m[0], m[4], m[8],  m[12],
+  m[1], m[5], m[9],  m[13],
+  m[2], m[6], m[10], m[14],
+  m[3], m[7], m[11], m[15]
+ );
+}
+</pre>
+
+<p>This allows us to set the transformation matrix, but in practice we'll find that updates have no effect. This is because ThreeJS <a href="http://en.wikipedia.org/wiki/Cache_(computing)">caches</a>. To accomodate changes we construct a container object and <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_4/arobject.js#L21">set the <code>matrixAutoUpdate</code> flag to <code>false</code></a>. Then for each update to the matrix <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_4/arobject.js#L16">set <code>matrixWorldNeedsUpdate</code> to <code>true</code></a>.</p>
+
+<h4>Step 2: Cube Marks the Marker</h4>
+<p>Now we'll use our monkey-patches and container objects to display colored cubes as augmented markers. First we make a cube mesh, sized to fit on the fiducial marker: (the dimensions were discovered by trial and error)</p>
+<pre lang="javascript">function createMarkerMesh(color) {
+    var geometry = new THREE.CubeGeometry( 100,100,100 );
+    var material = new THREE.MeshPhongMaterial( {color:color, side:THREE.DoubleSide } );
+
+    var mesh = new THREE.Mesh( geometry, material );                      
+
+    //Negative half the height makes the object appear "on top" of the AR Marker.
+    mesh.position.z = -50; 
+
+    return mesh;
+}
+</pre>
+
+<p>Then enclose the mesh in <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_4/arobject.js#L19">the container object</a>:</p>
+<pre>function createMarkerObject(params) {
+    var modelContainer = createContainer();
+
+    var modelMesh = createMarkerMesh(params.color);
+    modelContainer.add( modelMesh );
+
+    function transform(matrix) {
+        modelContainer.transformFromArray( matrix );
+    }
+}
+</pre>
+
+<p>Then generate marker objects, with each corresponding to a marker ID number:</p> 
+
+<pre lang="javascript">    // Create marker objects associated with the desired marker ID.
+    var markerObjects = {
+        16: arobject.createMarkerObject({color:0xAA0000}), // Marker #16, red.
+        32: arobject.createMarkerObject({color:0x00BB00}), // Marker #32, green.
+    };
+</pre>
+
+<p>The <code>ardetector.detect()</code> callbacks <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_4/application.js#L57">apply the transformation matrix to the associated marker</a>. For example, here the onCreate handler adds the transformed model to the arview:</p>
+
+<pre lang="javascript">// This function is called when a marker is initally detected on the stream
+function onMarkerCreated(marker) {
+    var object = markerObjects[marker.id];
+
+    // Set the objects initial transformation matrix.
+    object.transform( marker.matrix );
+
+    // Add the object to the scene.
+    view.add( object );
+}
+});
+</pre>
+
+<img src="example_4.png"/>
+<p>Our application is now a functioning example of augmented reality.</p>
+
+<h3>Making Holes</h3>
+
+<p>In An AR Game the markers are a bit more complex than colored cubes. They are "warpholes" which appear to go -into- the marker page. The effect requires a bit of trickery, so for the sake of illustration we'll construct the effect in three steps.
+
+</p><h4>Step 1: Open the Cube</h4>
+
+<p id="example_5">
+<code>git checkout example_5</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_5/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_5}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_5">tag</a>
+<a href="http://youtu.be/50nYnIBJtTg">movie</a>
+</p>
+
+First we remove the top face of the cube to create an open box. This is accomplished by <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_5/arobject.js#L35">setting the face's material</a> to <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_5/arobject.js#L29">be invisible</a>. The open box is positioned <i>behind</i>/<i>underneath</i> the marker page <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_5/arobject.js#L38">by adjusting the Z coordinate to 1/2 of the box height</a>.</p>
+
+<img src="example_5.png"/>
+<p>The effect is interesting, but unfinished &mdash; and perhaps it is not immediately clear why.</p>
+
+<h4>Step 2: Clad the Cube in Blue</h4>
+
+<p id="example_6">
+<code>git checkout example_6</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_6/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_6}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_6">tag</a>
+<a href="http://youtu.be/BtAxElxQiFk">movie</a>
+</p>
+
+<p>So what's missing? We need to hide the part of the box which juts from 'behind' the marker page. We'll accomplish this by first enclosing the box in a <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_6/arobject.js#L44">slightly larger box</a>. This box will be called an "occluder", and in <a href="#step3">step 3</a> will become an invisibility cloak. For now we'll leave it <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_6/arobject.js#L46">visible and color it blue</a>, as a visual aid.</p>
+
+<p>The <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_6/arview.js#L78">occluder objects</a> and the <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_6/arview.js#L75">augmented objects</a> are <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_6/arview.js#L85">rendered into the same context, but are seperate scenes</a>:</p>
+
+<pre lang="javascript">function render() {
+    // Render the reality scene
+    renderer.render(reality.scene, reality.camera);
+
+    // Render the occluder scene
+    renderer.render( occluder.scene, occluder.camera);
+
+    // Render the augmented components on top of the reality scene.
+    renderer.render(virtual.scene, virtual.camera);
+}
+</pre>
+
+<img src="example_6.png"/>
+<p>This blue jacket doesn't contribute much to the "warphole" illusion, yet.</p>
+
+<h4 id="step3">Step 3: Clad the Cube In Invisibility</h4>
+
+<p id="example_7">
+<code>git checkout example_7</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_7/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_7}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_7">tag</a>
+<a href="http://youtu.be/GM5eu3NBMZY">movie</a>
+</p>
+
+<p>The illusion requires that the blue jacket be invisible while retaining its occluding ability --- it should be an invisible occluder. The trick is to <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_7/arview.js#L90">deactivate the color buffers</a>, thereby rendering only to the depth buffer. The <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_7/arview.js#L85">render() method now becomes</a>:</p>
+
+<pre lang="javascript">function render() {
+    // Render the reality scene
+    renderer.render(reality.scene, reality.camera);
+
+    // Deactivate color and alpha buffers, leaving only depth buffer active.
+    renderer.context.colorMask(false,false,false,false);
+
+    // Render the occluder scene
+    renderer.render( occluder.scene, occluder.camera);
+
+    // Reactivate color and alpha buffers.
+    renderer.context.colorMask(true,true,true,true);
+
+    // Render the augmented components on top of the reality scene.
+    renderer.render(virtual.scene, virtual.camera);
+}
+</pre>
+
+<img src="example_7.png"/>
+<p>And that's a much more convincing illusion.</p>
+
+<h3>Selecting Holes</h3>
+
+<p id="example_8">
+<code>git checkout example_8</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_8/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_8}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_8">tag</a>
+</p>
+
+<p>An AR Game allows the user select which warphole to open by positioning the marker underneath a targeting reticule. This is a core aspect of the game, and it is technically known as <i>object picking</i>. ThreeJS makes this a fairly simple thing to do. The key classes are <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_8/arview.js#L92"><code>THREE.Projector()</code></a> and <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_8/arview.js#L95"><code>THREE.Raycaster()</code></a>, but there is a <a href="http://en.wiktionary.org/wiki/caveat">caveat</a>: despite a method name of <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_8/arview.js#L100"><code>Raycaster.intersect<i>Object</i>()</code></a>, it actually takes a <code>THREE.Mesh</code> as the parameter. Therefore we <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_8/arobject.js#L78">add a mesh named "hitbox"</a> to <code>createMarkerObject()</code>. In our case <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_8/arobject.js#L43">it is an invisible geometric plane</a>. Note that we are not explicitly setting a position for this mesh, leaving it with the default of (0,0,0) relative to the markerContainer object. This places it at the mouth of the warphole object, in the plane of the marker page. Which is where the face we removed would be if we didn't remove it.</p>
+
+<p>Ready with a testable hitbox, we make a class called <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_8/arview.js#L62"><code>Reticle</code></a> to handle intersection detection and state tracking. Reticle notifications are incorporated into the arview by including a callback when we <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_8/arview.js#L183"><code>arivew.add()</code> an object</a>. This callback will be invoked whenever the object is selected, for example:
+
+<pre lang="javascript">
+view.add( object, function(isSelected) {
+    onMarkerSelectionChanged(marker.id, isSelected);
+});
+</pre>
+
+The player is now able to select augmented markers by positioning them at the center of the screen.
+
+<h2>Refactor</h2>
+
+<p id="example_9">
+<code>git checkout example_9</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_9/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_9}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_9">tag</a>
+</p>
+
+<p>Our augmented reality functionality is essentially complete. We are able to detect markers in webcam frames and align 3D objects with them. We can also detect when a marker has been selected. We're ready to move on to the second key component of An AR Game: the flat 2d space from which the player transports playpieces. This will require a fair amount of code, and some preliminary refactoring would help keep everything neat. Notice that a lot of AR functionality is currently in the main application.js file. Let's excise it and place it into a dedicated module named <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_9/realspace.js">realspace.js</a>, leaving our <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_9/application.js">application.js</a> much cleaner.</p>
+
+<h2 id="flatspace">Panel of Flatspace<sup><small><a href="http://en.wikipedia.org/wiki/Flatland">&dash;</a></small></sup></h2>
+
+<p id="example_10">
+<code>git checkout example_10</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_10/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_10}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_10">tag</a>
+</p>
+
+<p>In An AR Game the player's task is to transfer playpieces from a 2D plane to a 3D space. The realspace module implemented earlier serves as the the 3D space. Our 2D plane will be managed by a module named flatspace.js, <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_10/flatspace.js">which begins as a skeletal pattern</a>. The skeleton shares symmetry between that of <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_0/application.js">application.js</a> and <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_9/realspace.js">realspace.js</a>.
+
+<h3>The Physics</h3>
+
+<p id="example_11">
+<code>git checkout example_11</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_11/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_11}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_11">tag</a>
+</p>
+
+<p>The <a href="http://en.wikipedia.org/wiki/Motion_(physics)">physics</a> of the realspace view comes free with <a href="http://en.wikipedia.org/wiki/Nature">nature</a>. But the flatspace pane uses simulated 2D physics, and that requires physics middleware. We'll use a javascript <a href="http://en.wikipedia.org/wiki/Source-to-source_compiler">transpilation</a> of the famous <a href="http://en.wikipedia.org/wiki/Box2d">Box2D</a> engine named <a href="https://github.com/kripken/box2d.js/">Box2D.js</a>. The javascript version is born from the original <a href="https://code.google.com/p/box2d/">C++</a> via <a href="http://en.wikipedia.org/wiki/LLVM">LLVM</a> processed by <a href="https://github.com/kripken/emscripten">emscripten</a>. 
+</p>
+<p>Box2D is a rather complex piece of software, but well <a href="http://box2d.org/manual.pdf">documented</a> and well <a href="http://box2d.org/manual.pdf">described</a>. Therefore this paper will, for the most part, refrain from repeating what the reader presumably knows. We will instead describe the common issues encountered when using Box2D, introduce a solution in the form of a module, and describe its integration into flatspace.js.</p>
+<p>First we build <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_11/boxworld.js">a wrapper for the raw Box2D.js world engine</a> and name it boxworld.js. This is then <a href="https://github.com/abrie/devderby-may-2013-technical/commit/23e97233b1da08b4aebedd96917e406613286c1a#diff-19f884bd80981aedf202452cae4fc0f0">integrated into flatspace</a>.</p>
+
+<p>This does not yield any outwardly visible affects, but in reality we are now simulating an empty space.</p>
+
+<h3>The Visualization</h3>
+<p>It would helpful to be able to see what's happening. Box2D thoughtfully provides debug rendering, and Box2D.js facilitates it through something like <a href="http://en.wikipedia.org/wiki/Virtual_function">virtual functions</a>. The functions will draw to a <code>canvas</code> context, so we'll need to create a canvas and then supply the VTable with draw methods.</p>
+<h4>Step 1: Make A Metric Canvas</h4>
+<p id="example_12">
+<code>git checkout example_12</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_12/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_12}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_12">tag</a>
+</p>
+
+<p>The <code>canvas</code> will map a Box2D world. A canvas uses pixels as its unit of measurement, whereas Box2D describes its space using meters. We'll need methods to convert between the two, by using a <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_12/boxview.js#L9">pixel-to-meter ratio</a> and <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_12/boxview.js#L12">aligning the coordinate origins</a>. The conversion methods use these constants to convert from <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_12/boxview.js#L24">pixels to meters</a>, and from <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_12/boxview.js#L31">meters to pixels</a>. The conversion methods are associated with a canvas and all are wrapped into the <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_12/boxview.js">boxview.js module</a>. This makes it easy to <a href="https://github.com/abrie/devderby-may-2013-technical/commit/dfa4fee9ccb3a40d17b7678adfdeb0d87a63420b#diff-19f884bd80981aedf202452cae4fc0f0">incorporate it into flatspace</a>:
+</p>
+
+<p>It is instaniated during initialization, and its canvas added to the DOM:</p>
+<pre lang="javascript">view = boxview.create({
+    width:640, 
+    height:480,
+    pixelsPerMeter:13,
+});
+
+document.getElementById("flatspace").appendChild( view.canvas );
+</pre>
+
+<p>There are now two canvases on the page &#8208; the flatspace and the realspace. A bit of CSS in <a href="https://github.com/abrie/devderby-may-2013-technical/blob/7d2c4de27aa3ed5b04ab1b02c0e79643a51e17f2/application.css">application.css</a> puts them side-by-side:</p>
+
+<pre lang="html">#realspace {
+    overflow:hidden;
+}
+
+#flatspace {
+    float:left;
+}
+</pre>
+
+<h4>Step 2: Assemble A Drafting Kit</h4>
+<p id="example_13">
+<code>git checkout example_13</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_13/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_13}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_13">tag</a>
+</p>
+
+As mentioned previously, Box2D.js provides hooks for drawing a debug sketch of the world. They are accessed via a <a href="http://en.wikipedia.org/wiki/Virtual_method_table">VTable</a> through the <a href="https://github.com/kripken/box2d.js/#using-debug-draw"><code>customizeVTable()</code></a> method, and subsequently invoked by <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_13/boxdebugdraw.js#L181"><code>b2World.DrawDebugData()</code></a>. We'll take the draw methods from <a href="https://github.com/kripken/box2d.js/#using-debug-draw">kripken's description</a>, and wrap them in a module called <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_13/boxdebugdraw.js">boxdebugdraw.js</a>.<p></p>
+
+<p>Now we can draw, but have nothing to draw. We need to jump through a few hoops first.</p>
+
+<h3>The Bureaucracy</h3>
+
+A Box2D world is populated by entities called Bodies. Adding a body to the boxworld subjects it to the laws of physics, but it must also comply with the rules of the game. For this we create a set of governing structures and methods to manage the population. Their application simplifies body creation, collision detection, and body destruction. Once these structures are in place we can begin to implement the game logic, building the system to be played. 
+
+<h4>Creation</h4>
+<p id="example_14">
+<code>git checkout example_14</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_14/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_14}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_14">tag</a>
+</p>
+<p>Let's liven up the simulation with some creation. Box2D Body construction is somewhat verbose, involving fixtures and shapes and technical parameters. So we'll stow our body creation methods in a module named <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_14/boxbody.js">boxbody.js</a>. To create a body we pass a <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_14/boxbody.js#L5">a boxbody method</a> to <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_14/boxworld.js#L13"><code>boxworld.add()</code></a>. <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_14/flatspace.js#L33">For example:</a></p>
+
+<pre lang="javascript">
+function populate() {
+    var ball = world.add(
+        boxbody.ball,
+        {
+            x:0,
+            y:8,
+            radius:10
+        }
+    );
+}
+</pre>
+
+<p>This yields an undecorated ball in midair experiencing the influence of gravity. Under contemplation it may bring to to mind a <a href="http://en.wikipedia.org/wiki/List_of_minor_The_Hitchhiker's_Guide_to_the_Galaxy_characters#Whale">particular whale</a>.</p>
+
+<h4>Registration</h4>
+<p id="example_15">
+<code>git checkout example_15</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_15/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_15}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_15">tag</a>
+</p>
+<p>We must be able to keep track of the bodies populating flatworld. Box2D provides access to a body list, but it's a bit too low level for our purposes. Instead we'll use a field of <code>b2Body</code> named <code>userData</code>. To it we assign a unique ID number subsequently used as an index to a registry of our own design. It is implemented in boxregistry.js, and is a key aspect of the flatspace implementation. It enables the association of bodies with decorative entities (such as sprites), simplifies collision callbacks, and facilitates the removal of bodies from the simulation. The implementation details won't be described here, but interested readers are referred to repo to see how <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_15/boxworld.js#L8">the registry is instantiated</a> in boxworld.js, and how <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_15/boxworld.js#L14">the <code>add()</code> method</a> <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_15/boxworld.js#L16">returns wrapped-and-registered bodies.</a></p>
+
+<h4>Collision</h4>
+<p id="example_16">
+<code>git checkout example_16</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_16/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_16}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_16">tag</a>
+</p>
+<p>Box2D collision detection is complicated because the native callback simply gives two fixtures, raw and unordered. And any collisions that occur in the world are reported, making for a lot of conditional checks. The boxregistry.js module avails itself to managing the data overload. Through it assign <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_16/boxregistry.js#L20">an onContact callback</a> to registered objects. Then when a Box2D collision handler is triggered <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_16/boxworld.js#L38">we query the registry for the assocated objects</a> and check for the <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_16/boxworld.js#L41">presence of a callback</a>. If the object has a defined callback then we know its collision activity is of interest. So to use this functionality in flatspace.js, we simply need to <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_16/flatspace.js#L52">assign a collision callback to a registered object</a>:</p> 
+
+<pre lang="javascript">function populate() {
+    var ground = world.add(
+        boxbody.edge,
+        {
+            x:0,
+            y:-15,
+            width:20,
+            height:0,
+        }
+    );
+
+    var ball = world.add(
+        boxbody.ball,
+        {
+            x:0,
+            y:8,
+            radius:10
+        }
+    );
+
+    ball.onContact = function(object) {
+        console.log("The ball has contacted:", object);
+    };
+}
+</pre>
+
+<h4>Deletion</h4>
+<p id="example_17">
+<code>git checkout example_17</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_17/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_17}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_17">tag</a>
+</p>
+
+<p>Removing bodies is complicated by the fact that Box2D does not allow calls to <code>b2World.DestroyBody()</code> while within <code>b2World.Step()</code>. This is significant because usually you'll want to delete a body because of a collision, and collision callbacks occur during a simulation step. Conundrum. One solution is to queue bodies for deletion, then process the queue outside of the simulation step. The <code>boxregistry</code> addresses the problem by furnishing a flag, <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_17/boxregistry.js#L22"><code>isMarkedForDeletion</code></a>, for each object. The collection of registered objects <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_17/boxregistry.js#L50">is iterated and listeners are notified of the deletion request</a>. The iteration <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_17/boxworld.js#L26">happens after a simulation step</a>, so the <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_17/boxworld.js#L18">deletion callback cleanly destroys the bodies</a>. Perceptive readers may notice that we now <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_17/boxworld.js#L48">check the isMarkedForDeletion flag before invoking collision callbacks</a>.</p>
+
+<p>This happens transparently as far as flatspace.js is concerned, so all we need to do is <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_17/flatspace.js#L54">set the deletion flag for a registered object</a>:</p>
+
+<pre lang="javascript">ball.onContact = function(object) {
+    console.log("The ball has contacted:", object);
+    ball.isMarkedForDeletion = true;
+};
+</pre>            
+
+<p>Now the body is deleted on contact with the ground.</p>
+
+<h4>Discerning</h4>
+<p id="example_18">
+<code>git checkout example_18</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_18/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_18}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_18">tag</a>
+</p>
+<p>
+When a collision is detected An AR Game needs to know what the object has collided with. To this end we add an <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_18/boxregistry.js#L23"><code>is()</code> method for registry objects</a>, used for comparing objects. We will now add <a ref="https://github.com/abrie/devderby-may-2013-technical/blob/example_18/flatspace.js#L54">a conditional deletion</a> to our game: 
+</p>
+<pre lang="javascript">ball.onContact = function(object) {
+    console.log("The ball has contacted:", object);
+    if( object.is( ground ) ) {
+        ball.isMarkedForDeletion = true;
+    }
+};
+</pre>
+
+<h3>A 2D Warphole</h3>
+<p id="example_19">
+<code>git checkout example_19</code>
+<a href="http://abrie.github.io/devderby-may-2013-technical/example_19/application.html">live</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_19}}">diff</a>
+<a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_19">tag</a>
+</p>
+<p>
+We've already discussed the realspace warpholes, and now we'll implement their flatspace counterparts. The flatspace warphole is simply a body consisting of a Box2D sensor. The ball should pass over a closed warphole, but an open warphole causes the ball to be sent to another dimension. Now imagine an edge case where a ball is over a closed warphole which is then opened up. The problem is that Box2D's onBeginContact handler behaves true to its name, meaning that we detected warphole contact during the closed state but have since opened the warphole. Therefore the ball is not warped, and we're left with a bug. Our fix is to use a cluster of sensors. With a cluster we are more sure that as a ball moves over the body at least one sensor will trigger an onBeginContact. Thus we can be confident that opening a warphole while the ball is over it will result in a warp. The sensor cluster generator is named <a href="https://github.com/abrie/devderby-may-2013-technical/blob/example_19/boxbody.js#L42"><code>hole</code> and implemented in boxbody.js</a>. The generated cluster looks like this:  
+ 
+</p>
+<img src="sensor-cluster.png">
+<h2 id="conduit">The Conduit</h2>
+<p>At this point we've made usable modules of JSARToolkit and Box2D.js. We've used them to create warpholes in realspace and flatspace. The objective of An AR Game is to transport pieces from flatspace to the realspace, so it is necessary that the warpholes communicate. Our approach is as follows:
+</p><ol>
+    <li>
+        <code>git checkout example_20</code>
+        <a href="http://abrie.github.io/devderby-may-2013-technical/example_20/application.html">live</a>
+        <a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_20}}">diff</a>
+        <a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_20">tag</a>
+        <p>Notify the application when a realspace warphole's state changes.</p>
+    </li>
+    <li>
+        <code>git checkout example_21</code>
+        <a href="http://abrie.github.io/devderby-may-2013-technical/example_21/application.html">live</a>
+        <a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_21}}">diff</a>
+        <a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_21">tag</a>
+        <p>Set flatspace warphole states according to realspace warphole states.</p>
+    </li>
+    <li>
+        <code>git checkout example_22</code>
+        <a href="http://abrie.github.io/devderby-may-2013-technical/example_22/application.html">live</a>
+        <a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_22}}">diff</a>
+        <a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_22">tag</a>
+        <p>Notify the application when a ball transits an open flatspace warphole.</p>
+    </li>
+    <li>
+        <code>git checkout example_23</code>
+        <a href="http://abrie.github.io/devderby-may-2013-technical/example_23/application.html">live</a>
+        <a href="https://github.com/abrie/devderby-may-2013-technical/commit/{{hashFor_example_23}}">diff</a>
+        <a href="https://github.com/abrie/devderby-may-2013-technical/tree/example_23">tag</a>
+        <p>Add a ball to realspace when the application receives a notification of a transit.</p>
+    </li>
+</ol>
+<p></p>
+<h2>The Incomplete Conclusion</h2>
+This paper has shown the technical underpinnings of An AR Game. We have constructed two panes of differing realities and connected them with warpholes. A player may now entertain herself by transporting a ball from flatspace to realspace. Technically this is interesting. But generally it is not fun. There is still much to be done before this application becomes a game, but they are outside the scope of this paper. Among the remaining tasks are:
+<ul>
+    <li>Sprites and animations.</li>
+    <li>Introduce multiple balls and warpholes.</li>
+    <li>Provide a means of interactively designing levels.</li>
+</ul>
+</body></html>
